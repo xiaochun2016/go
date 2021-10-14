@@ -2,7 +2,8 @@ package main
 
 import (
 	"fmt"
-	log2 "gocode/project01/loger/log"
+	log3 "logger/log"
+	"os"
 	"path"
 	"runtime"
 	"time"
@@ -21,8 +22,7 @@ func getFileInfo() {
 }
 func main() {
 	for {
-
-		log := log2.NewFileLogger("error", "./", "xc.log", 10*1024*1024)
+		log := log3.NewFileLogger("error", "D:/goworkspace/src/logger/", "xc.log", 1024)
 		//log := log2.NewFileLog("error")
 		log.Debug("这是个debug日志")
 		log.Info("这是个info日志")
@@ -37,4 +37,16 @@ func main() {
 		fmt.Println()
 	}
 
+}
+func f() {
+	fileObj, err := os.Open("./main.go")
+	if err != nil {
+		fmt.Printf("open file failed %v", err)
+	}
+	fileInfo, err := fileObj.Stat()
+	if err != nil {
+		fmt.Printf("get open file info failed %v", err)
+	}
+	fmt.Println(fileInfo.Size())
+	fmt.Println(fileInfo.Name())
 }

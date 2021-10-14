@@ -5,6 +5,7 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"time"
 )
 
 type FileLog struct {
@@ -66,10 +67,41 @@ func (f FileLog) log(lv Loglevel, format string, arg ...interface{}) {
 			fmt.Printf("获取失败")
 			return
 		}
+		fileObj, err := os.Open(fileName)
+		if err != nil {
+			fmt.Printf("open file failed %s", err)
+			return
+		}
+		fileInfo, err := fileObj.Stat()
+		if err != nil {
+			fmt.Printf("get open file info failed %s", err)
+			return
+		}
+		fileSize := fileInfo.Size()
+		if fileSize >= f.maxFileSize {
+			newName := path.Join(f.FilePath, f.fileName)
+			newName += "." + time.Now().Format("20060102150304")
+			oldName := path.Join(f.FilePath, f.fileName)
+			fmt.Println(oldName, newName)
+			f.fileObj.Close()
+			err := os.Rename(oldName, newName)
+			if err != nil {
+				fmt.Println("rename failed", err)
+				return
+
+			}
+			fileObj, err := os.OpenFile(newName, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0755)
+			if err != nil {
+				fmt.Println("open file failed ", err)
+				return
+			}
+			f.fileObj = fileObj
+
+		}
 		msg := fmt.Sprintf(format, arg...)
 		fmt.Fprintf(f.fileObj, "[%s] [%s] [%s:%d:%s] %s\n", GetNow(), levelStr, fucName, line, path.Base(fileName), msg)
 		if lv >= ERROR {
-			fmt.Fprintf(f.errFileObj, "[%s] [%s] [%s:%d:%s] %s\n", GetNow(), levelStr, fucName, line, path.Base(fileName), msg)
+			//fmt.Fprintf(f.errFileObj, "[%s] [%s] [%s:%d:%s] %s\n", GetNow(), levelStr, fucName, line, path.Base(fileName), msg)
 		}
 	}
 }
