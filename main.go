@@ -21,8 +21,8 @@ func getFileInfo() {
 	fmt.Println(line)
 }
 func main() {
+	log := log3.NewFileLogger("debug", "./", "xc.log", 1024, 2)
 	for {
-		log := log3.NewFileLogger("error", "D:/goworkspace/src/logger/", "xc.log", 1024)
 		//log := log2.NewFileLog("error")
 		log.Debug("这是个debug日志")
 		log.Info("这是个info日志")

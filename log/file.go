@@ -16,9 +16,11 @@ type FileLog struct {
 	maxFileSize int64
 	fileObj     *os.File
 	errFileObj  *os.File
+	cutType     uint8
+	currentDate string
 }
 
-func NewFileLogger(levelStr, fp, fn string, maxSize int64) *FileLog {
+func NewFileLogger(levelStr, fp, fn string, maxSize int64, cutType uint8) *FileLog {
 	loglevel, err := ParseLogLevel(levelStr)
 	if err != nil {
 		panic(err)
@@ -28,6 +30,8 @@ func NewFileLogger(levelStr, fp, fn string, maxSize int64) *FileLog {
 		fileName:    fn,
 		FilePath:    fp,
 		maxFileSize: maxSize,
+		cutType:     cutType,
+		currentDate: time.Now().Format("200601021504"),
 	}
 	err = fl.initFile()
 	if err != nil {
@@ -56,53 +60,92 @@ func (f *FileLog) initFile() (err error) {
 
 func (f FileLog) log(lv Loglevel, format string, arg ...interface{}) {
 	if f.level <= lv {
-		pc, fileName, line, ok := runtime.Caller(2)
-		if !ok {
-			fmt.Printf("获取失败")
-			return
+		if f.cutType == 1 {
+			f.cutSize(lv, format, arg)
+		} else if f.cutType == 2 {
+			f.cutTime(lv, format, arg)
 		}
-		fucName := runtime.FuncForPC(pc).Name()
-		levelStr, err := UnParseLogLevel(lv)
-		if err != nil {
-			fmt.Printf("获取失败")
-			return
-		}
-		fileObj, err := os.Open(fileName)
-		if err != nil {
-			fmt.Printf("open file failed %s", err)
-			return
-		}
-		fileInfo, err := fileObj.Stat()
-		if err != nil {
-			fmt.Printf("get open file info failed %s", err)
-			return
-		}
-		fileSize := fileInfo.Size()
-		if fileSize >= f.maxFileSize {
-			newName := path.Join(f.FilePath, f.fileName)
-			newName += "." + time.Now().Format("20060102150304")
-			oldName := path.Join(f.FilePath, f.fileName)
-			fmt.Println(oldName, newName)
-			f.fileObj.Close()
-			err := os.Rename(oldName, newName)
-			if err != nil {
-				fmt.Println("rename failed", err)
-				return
 
-			}
-			fileObj, err := os.OpenFile(newName, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0755)
-			if err != nil {
-				fmt.Println("open file failed ", err)
-				return
-			}
-			f.fileObj = fileObj
+	}
+}
+func (f FileLog) cutTime(lv Loglevel, format string, arg ...interface{}) {
+	pc, fileName, line, ok := runtime.Caller(2)
+	if !ok {
+		fmt.Printf("获取失败")
+		return
+	}
+	fucName := runtime.FuncForPC(pc).Name()
+	levelStr, err := UnParseLogLevel(lv)
+	if err != nil {
+		fmt.Printf("获取失败")
+		return
+	}
+	nowData := time.Now().Format("200601021504")
 
+	if f.currentDate != nowData {
+		f.fileObj.Close()
+		f.fileName += "." + nowData
+		newName := path.Join(f.FilePath, f.fileName)
+		fileObj, err := os.OpenFile(newName, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0755)
+		if err != nil {
+			fmt.Println("open file failed ", err)
+			return
 		}
-		msg := fmt.Sprintf(format, arg...)
-		fmt.Fprintf(f.fileObj, "[%s] [%s] [%s:%d:%s] %s\n", GetNow(), levelStr, fucName, line, path.Base(fileName), msg)
-		if lv >= ERROR {
-			//fmt.Fprintf(f.errFileObj, "[%s] [%s] [%s:%d:%s] %s\n", GetNow(), levelStr, fucName, line, path.Base(fileName), msg)
+		f.currentDate = nowData
+		f.fileObj = fileObj
+	}
+	fmt.Println(f.currentDate, nowData)
+	msg := fmt.Sprintf(format, arg...)
+	fmt.Fprintf(f.fileObj, "[%s] [%s] [%s:%d:%s] %s\n", GetNow(), levelStr, fucName, line, path.Base(fileName), msg)
+	if lv >= ERROR {
+		fmt.Fprintf(f.errFileObj, "[%s] [%s] [%s:%d:%s] %s\n", GetNow(), levelStr, fucName, line, path.Base(fileName), msg)
+	}
+}
+
+func (f FileLog) cutSize(lv Loglevel, format string, arg ...interface{}) {
+	pc, fileName, line, ok := runtime.Caller(2)
+	if !ok {
+		fmt.Printf("获取失败")
+		return
+	}
+	fucName := runtime.FuncForPC(pc).Name()
+	levelStr, err := UnParseLogLevel(lv)
+	if err != nil {
+		fmt.Printf("获取失败")
+		return
+	}
+	fileObj, err := os.Open(fileName)
+	if err != nil {
+		fmt.Printf("open file failed %s", err)
+		return
+	}
+	fileInfo, err := fileObj.Stat()
+	if err != nil {
+		fmt.Printf("get open file info failed %s", err)
+		return
+	}
+	fileSize := fileInfo.Size()
+	if fileSize >= f.maxFileSize {
+		newName := path.Join(f.FilePath, f.fileName)
+		newName += "." + time.Now().Format("20060102150304")
+		oldName := path.Join(f.FilePath, f.fileName)
+		err := os.Rename(oldName, newName)
+		if err != nil {
+			fmt.Println("rename failed", err)
+			return
 		}
+		f.fileObj.Close()
+		fileObj, err := os.OpenFile(oldName, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0755)
+		if err != nil {
+			fmt.Println("open file failed ", err)
+			return
+		}
+		f.fileObj = fileObj
+	}
+	msg := fmt.Sprintf(format, arg...)
+	fmt.Fprintf(f.fileObj, "[%s] [%s] [%s:%d:%s] %s\n", GetNow(), levelStr, fucName, line, path.Base(fileName), msg)
+	if lv >= ERROR {
+		//fmt.Fprintf(f.errFileObj, "[%s] [%s] [%s:%d:%s] %s\n", GetNow(), levelStr, fucName, line, path.Base(fileName), msg)
 	}
 }
 
